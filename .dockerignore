@@ -1,0 +1,5 @@
+profiles/
+recordings/
+sessions/
+.git/
+node_modules/

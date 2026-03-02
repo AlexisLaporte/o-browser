@@ -1,0 +1,10 @@
+node_modules/
+
+# Chrome profiles (persistent, contain cookies/passwords)
+profiles/
+
+# Session data (temporary)
+sessions/
+
+# Recordings (can be large)
+recordings/

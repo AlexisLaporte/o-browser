@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browser</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <span class="icon">B</span>
+        <span>Browser</span>
+      </div>
+      <div class="status">
+        <span id="status-dot" class="dot"></span>
+        <span id="status-text">Checking...</span>
+      </div>
+    </header>
+
+    <!-- Controls -->
+    <div id="controls">
+      <div id="session-info" class="hidden">
+        <div class="info-row">
+          <span class="label">Session</span>
+          <span id="session-id" class="mono"></span>
+        </div>
+        <div class="info-row">
+          <span class="label">Started</span>
+          <span id="session-time"></span>
+        </div>
+      </div>
+      <div id="actions">
+        <button id="btn-start" class="btn btn-primary">Start Session</button>
+        <button id="btn-stop" class="btn btn-danger hidden">Stop Session</button>
+        <button id="btn-screenshot" class="btn btn-secondary hidden">Screenshot</button>
+      </div>
+    </div>
+
+    <!-- Main content -->
+    <div id="main">
+      <!-- VNC Viewer -->
+      <div id="vnc-container">
+        <div id="vnc-placeholder">
+          <div class="placeholder-content">
+            <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <p>No active session</p>
+            <p class="hint">Click "Start Session" to begin</p>
+          </div>
+        </div>
+        <iframe id="vnc-iframe" class="hidden" allow="clipboard-read; clipboard-write"></iframe>
+      </div>
+
+      <!-- Recordings Panel -->
+      <div id="recordings-panel" class="hidden">
+        <h3>Recordings</h3>
+
+        <div class="recording-item">
+          <div class="recording-header">
+            <span class="recording-icon">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <span class="recording-name">Screencast</span>
+            <span id="rec-video-status" class="recording-status recording"></span>
+          </div>
+          <div class="recording-details">
+            <span id="rec-video-size" class="recording-size">-</span>
+            <a id="rec-video-download" class="recording-download hidden" target="_blank">Download</a>
+          </div>
+        </div>
+
+        <div class="recording-item">
+          <div class="recording-header">
+            <span class="recording-icon">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <span class="recording-name">Network (HAR)</span>
+            <span id="rec-har-status" class="recording-status recording"></span>
+          </div>
+          <div class="recording-details">
+            <span id="rec-har-size" class="recording-size">-</span>
+            <span id="rec-har-entries" class="recording-entries"></span>
+            <a id="rec-har-download" class="recording-download hidden" target="_blank">Download</a>
+          </div>
+        </div>
+
+        <div class="recording-item">
+          <div class="recording-header">
+            <span class="recording-icon">
+              <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </span>
+            <span class="recording-name">Screenshots</span>
+          </div>
+          <div class="recording-details">
+            <span id="rec-screenshots-count" class="recording-size">0 captures</span>
+          </div>
+          <div id="screenshots-list" class="screenshots-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
