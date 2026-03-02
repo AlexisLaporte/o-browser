@@ -62,7 +62,7 @@ pkill -f "x11vnc -display :${DISPLAY_NUM}" 2>/dev/null || true
 pkill -f "websockify.*${NOVNC_PORT}.*${VNC_PORT}" 2>/dev/null || true
 pkill -f "google-chrome.*--remote-debugging-port=${CDP_PORT}" 2>/dev/null || true
 pkill -f "ffmpeg -y -f x11grab" 2>/dev/null || true
-pkill -f "node.*har-recorder" 2>/dev/null || true
+pkill -f "node.*session-recorder" 2>/dev/null || true
 sleep 1
 
 # Create recording directory
@@ -123,15 +123,15 @@ ffmpeg -y -f x11grab -video_size 1920x1080 -framerate 10 -i :${DISPLAY_NUM} \
   "${RECORDING_DIR}/screencast.mp4" > /tmp/ffmpeg.log 2>&1 &
 FFMPEG_PID=$!
 
-# 6. Start HAR recorder
-HAR_PID=0
-if [ -f "${BASE_DIR}/har-recorder.js" ]; then
-  node "${BASE_DIR}/har-recorder.js" "${RECORDING_DIR}/network.har" ${CDP_PORT} > "${RECORDING_DIR}/har-recorder.log" 2>&1 &
-  HAR_PID=$!
+# 6. Start session recorder (rrweb + HAR + browser state)
+RECORDER_PID=0
+if [ -f "${BASE_DIR}/session-recorder.js" ]; then
+  node "${BASE_DIR}/session-recorder.js" "${RECORDING_DIR}" ${CDP_PORT} > "${RECORDING_DIR}/session-recorder.log" 2>&1 &
+  RECORDER_PID=$!
   sleep 1
-  if ! kill -0 "$HAR_PID" 2>/dev/null; then
-    echo "WARNING: HAR recorder failed to start"
-    HAR_PID=0
+  if ! kill -0 "$RECORDER_PID" 2>/dev/null; then
+    echo "WARNING: Session recorder failed to start"
+    RECORDER_PID=0
   fi
 fi
 
@@ -157,7 +157,7 @@ cat > "${SESSION_FILE}" << EOF
     "chrome": ${CHROME_PID},
     "novnc": ${NOVNC_PID},
     "ffmpeg": ${FFMPEG_PID},
-    "har": ${HAR_PID}
+    "recorder": ${RECORDER_PID}
   },
   "cdp": {
     "port": ${CDP_PORT},
@@ -172,6 +172,8 @@ cat > "${SESSION_FILE}" << EOF
     "dir": "${RECORDING_DIR}",
     "screencast": "${RECORDING_DIR}/screencast.mp4",
     "har": "${RECORDING_DIR}/network.har",
+    "rrweb": "${RECORDING_DIR}/rrweb-events.json",
+    "state": "${RECORDING_DIR}/browser-state.jsonl",
     "screenshots": "${RECORDING_DIR}/screenshots"
   },
   "status": "running"

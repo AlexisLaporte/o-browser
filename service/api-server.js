@@ -170,6 +170,8 @@ function listSessionFiles(sessionId) {
     sessionId,
     screencast: null,
     har: null,
+    rrweb: null,
+    browserState: null,
     screenshots: []
   };
 
@@ -182,13 +184,26 @@ function listSessionFiles(sessionId) {
     if (file === 'screencast.mp4') {
       result.screencast = { name: file, size: stat.size };
     } else if (file === 'network.har') {
-      // Count HAR entries
       let entries = 0;
       try {
         const har = JSON.parse(fs.readFileSync(filePath, 'utf8'));
         entries = har.log?.entries?.length || 0;
       } catch (e) {}
       result.har = { name: file, size: stat.size, entries };
+    } else if (file === 'rrweb-events.json') {
+      let events = 0;
+      try {
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        events = Array.isArray(data) ? data.length : 0;
+      } catch (e) {}
+      result.rrweb = { name: file, size: stat.size, events };
+    } else if (file === 'browser-state.jsonl') {
+      let snapshots = 0;
+      try {
+        const content = fs.readFileSync(filePath, 'utf8').trim();
+        if (content) snapshots = content.split('\n').length;
+      } catch (e) {}
+      result.browserState = { name: file, size: stat.size, snapshots };
     } else if (file.endsWith('.png') || file.endsWith('.jpg')) {
       result.screenshots.push({
         name: file,
@@ -238,6 +253,7 @@ function serveRecording(req, res, sessionId, filename) {
     '.mp4': 'video/mp4',
     '.har': 'application/json',
     '.json': 'application/json',
+    '.jsonl': 'application/x-ndjson',
     '.png': 'image/png',
     '.jpg': 'image/jpeg'
   };

@@ -39,8 +39,19 @@ if [ -n "$FFMPEG_PID" ] && [ "$FFMPEG_PID" != "null" ] && [ "$FFMPEG_PID" != "0"
     kill -9 "$FFMPEG_PID" 2>/dev/null || true
 fi
 
+# Graceful recorder shutdown (SIGTERM lets it flush rrweb/HAR/state)
+RECORDER_PID=$(jq -r ".pids.recorder // empty" "$CURRENT_FILE" 2>/dev/null)
+if [ -n "$RECORDER_PID" ] && [ "$RECORDER_PID" != "null" ] && [ "$RECORDER_PID" != "0" ]; then
+    kill -TERM "$RECORDER_PID" 2>/dev/null || true
+    for i in $(seq 1 4); do
+        kill -0 "$RECORDER_PID" 2>/dev/null || break
+        sleep 0.5
+    done
+    kill -9 "$RECORDER_PID" 2>/dev/null || true
+fi
+
 # Kill remaining processes
-for pid_key in har xvfb novnc watchdog; do
+for pid_key in xvfb novnc watchdog; do
     pid=$(jq -r ".pids.$pid_key // .${pid_key}_pid // empty" "$CURRENT_FILE" 2>/dev/null)
     if [ -n "$pid" ] && [ "$pid" != "null" ] && [ "$pid" != "0" ]; then
         kill -9 "$pid" 2>/dev/null || true

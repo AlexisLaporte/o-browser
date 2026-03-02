@@ -33,13 +33,13 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/app/.browsers
 RUN npx patchright install chromium --with-deps \
     && ln -sf $(find /app/.browsers -name "chrome" -type f | head -1) /usr/bin/google-chrome
 
-# Copy app files
-COPY api-server.js har-recorder.js ./
-COPY *.sh ./
+# Copy service files (flatten into /app/ for runtime)
+COPY service/api-server.js service/session-recorder.js ./
+COPY service/start-session.sh service/end-session.sh ./
 RUN chmod +x *.sh
 
 # Copy UI
-COPY index.html style.css app.js ./ui/
+COPY service/ui/ ./ui/
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/nginx.conf

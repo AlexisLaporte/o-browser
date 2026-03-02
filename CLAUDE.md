@@ -19,12 +19,23 @@ o-browser/
 ├── start-session.sh        # Launches Chrome + Xvfb + VNC + ffmpeg per session
 ├── end-session.sh          # Stops session processes and saves recordings
 ├── api-server.js           # HTTP API (sessions, recordings, screenshots)
-├── har-recorder.js         # HAR network recording via CDP
+├── session-recorder.js     # Unified recorder: rrweb DOM + HAR with bodies + browser state
 ├── nginx.conf              # Reverse proxy: /api, /vnc, /cdp on port 8080
 ├── profiles/               # Chrome profiles (volume-mounted, gitignored)
 ├── recordings/             # Session recordings (gitignored)
 ├── sessions/               # Session state (gitignored)
 └── index.html/style.css/app.js  # Status page UI
+```
+
+### Recording output per session
+```
+recordings/ses_YYYYMMDD_HHMMSS/
+├── rrweb-events.json       # DOM + interactions (rejouable avec rrweb-player)
+├── network.har             # HAR 1.2 with response bodies (compatible Playwright routeFromHAR)
+├── browser-state.jsonl     # Cookies/localStorage/sessionStorage snapshots (JSONL)
+├── screencast.mp4          # Video continue (ffmpeg x11grab)
+├── session-recorder.log    # Recorder logs
+└── screenshots/            # Manual screenshots via API
 ```
 
 ## Nginx Routing (port 8080)

@@ -8,3 +8,9 @@ sessions/
 
 # Recordings (can be large)
 recordings/
+
+# Python
+__pycache__/
+*.egg-info/
+dist/
+.eggs/

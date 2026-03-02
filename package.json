@@ -8,6 +8,7 @@
     "start": "node api-server.js"
   },
   "dependencies": {
+    "@rrweb/record": "^2.0.0-alpha.20",
     "ws": "^8.19.0"
   }
 }
