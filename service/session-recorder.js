@@ -84,11 +84,11 @@ let rrwebScript = null;
 
 function loadRrwebScript() {
   // Try multiple possible paths for the rrweb UMD bundle
-  const candidates = [
-    path.join(__dirname, 'node_modules', '@rrweb', 'record', 'dist', 'record.umd.cjs'),
-    path.join(__dirname, 'node_modules', '@rrweb', 'record', 'dist', 'record.js'),
-    path.join(__dirname, 'node_modules', 'rrweb', 'dist', 'record', 'rrweb-record.umd.cjs'),
-  ];
+  const bases = [__dirname, path.join(__dirname, '..')];
+  const candidates = bases.flatMap(base => [
+    path.join(base, 'node_modules', '@rrweb', 'record', 'dist', 'record.umd.cjs'),
+    path.join(base, 'node_modules', '@rrweb', 'record', 'dist', 'record.js'),
+  ]);
   for (const p of candidates) {
     if (fs.existsSync(p)) {
       console.log(`rrweb script found: ${p}`);
