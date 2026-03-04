@@ -44,15 +44,15 @@ const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
 function getCdpWebSocketUrl() {
   return new Promise((resolve, reject) => {
-    http.get(`http://127.0.0.1:${cdpPort}/json`, (res) => {
+    http.get(`http://127.0.0.1:${cdpPort}/json/version`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
-        const pages = JSON.parse(data);
-        if (pages.length > 0) {
-          resolve(pages[0].webSocketDebuggerUrl);
+        const info = JSON.parse(data);
+        if (info.webSocketDebuggerUrl) {
+          resolve(info.webSocketDebuggerUrl);
         } else {
-          reject(new Error('No pages found'));
+          reject(new Error('No browser WebSocket URL found'));
         }
       });
     }).on('error', reject);
