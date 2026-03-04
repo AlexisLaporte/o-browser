@@ -1,125 +1,65 @@
-# o-browser — Browser Automation (Direct + Service)
+# o-browser — Headless Chrome Service
 
-Two modes:
-1. **Direct** (Python) — `BrowserClient` launches Chrome, does the job, closes. `RemoteBrowser` connects via CDP.
-2. **Service** (Node.js) — API + VNC + recording + dashboard in Docker.
+Remote Chrome with API, VNC, CDP proxy, and session recording.
 
 ## Stack
 
-- **Python**: Patchright (anti-detection Playwright fork)
-- **Node.js**: ws, @rrweb/record (service only)
-- **Browser**: Chrome/Chromium via Patchright
-- **CLI**: Typer (optional dep)
+- **Runtime**: Node.js 20 + Bash
+- **Browser**: Google Chrome stable (default), configurable via `BROWSER` build arg
+- **Recording**: rrweb DOM replay + HAR with bodies + browser state snapshots
+- **Dependencies**: ws, @rrweb/record
 
 ## Structure
 
 ```
 o-browser/
-├── o_browser/                  # Python package
-│   ├── __init__.py             # Exports: BrowserClient, RemoteBrowser
-│   ├── _mixin.py               # PageMixin (nav, interactions, scroll, GIF)
-│   ├── client.py               # BrowserClient (direct mode)
-│   ├── remote.py               # RemoteBrowser (CDP connect)
-│   └── cli.py                  # CLI Typer subapp (fetch, screenshot, open, run)
-├── pyproject.toml              # Package config — deps: patchright, optional: typer
-│
-├── service/                    # Node.js service (Docker only)
-│   ├── api-server.js           # HTTP API (sessions, recordings, screenshots)
-│   ├── session-recorder.js     # rrweb DOM + HAR + browser state recorder
-│   ├── start-session.sh        # Launches Chrome + Xvfb + VNC + ffmpeg
-│   ├── end-session.sh          # Stops session, saves recordings
-│   └── ui/                     # Status page
-│
-├── Dockerfile                  # node:20-slim + Patchright Chrome + VNC + ffmpeg
+├── api-server.js           # HTTP API (sessions, recordings, screenshots)
+├── session-recorder.js     # rrweb DOM + HAR + browser state via CDP
+├── start-session.sh        # Launches Chrome + Xvfb + VNC + ffmpeg + recorder
+├── end-session.sh          # Stops session, saves recordings
+├── ui/                     # Status page (index.html, app.js, style.css)
+├── Dockerfile              # ARG BROWSER=chrome|chrome-beta|chromium
 ├── docker-compose.yml
 ├── docker-entrypoint.sh
-├── nginx.conf                  # Reverse proxy: /api, /vnc, /cdp on port 8080
+├── nginx.conf              # Reverse proxy: /api, /vnc, /cdp on port 8080
 └── package.json
 ```
 
-## Python Package
+## Docker
 
 ```bash
-pip install -e /path/to/o-browser        # Direct mode
-pip install -e "/path/to/o-browser[cli]"  # + CLI (typer)
+docker build -t o-browser .                              # Chrome stable (default)
+docker build --build-arg BROWSER=chrome-beta -t o-browser .  # Chrome Beta
+docker build --build-arg BROWSER=chromium -t o-browser .     # Chromium
 ```
 
-### BrowserClient — all modes
+## API (port 8080 via nginx)
 
-```python
-from o_browser import BrowserClient
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/sessions` | Start session `{workflow, profile}` |
+| `GET` | `/api/sessions/current` | Current session (CDP URL, VNC, status) |
+| `DELETE` | `/api/sessions/current` | End session |
+| `POST` | `/api/sessions/current/screenshot` | X11 screenshot `{name}` |
+| `GET` | `/api/sessions/:id/files` | List recordings (screencast, HAR, rrweb, state) |
+| `GET` | `/api/recordings/:id/:file` | Serve recording file (Range support) |
+| `GET` | `/api/profiles` | List Chrome profiles |
+| `GET` | `/health` | Health check |
 
-# Headless automation
-async with BrowserClient() as browser:
-    await browser.goto("https://example.com")
-    text = await browser.get_text()
+## Profiles
 
-# With profile + proxy + recording
-async with BrowserClient(
-    profile_path="~/.browser/profiles/myprofile",
-    proxy={"server": "http://host:port", "username": "u", "password": "p"},
-    record=True, record_dir="./recordings",
-) as browser:
-    await browser.goto("https://example.com")
-# → recordings/{network.har, *.webm, state.json}
+- `profiles/` — persistent Chrome profiles (volume-mounted)
+- `profiles-seed/` — initial profile data, copied on first use if profile doesn't exist
 
-# Interactive — Chrome visible, human navigates, recordings saved on close
-async with BrowserClient(interactive=True, record=True) as browser:
-    await browser.wait_closed()
-```
+## Recording
 
-### RemoteBrowser — connect to running service
-
-```python
-from o_browser import RemoteBrowser
-async with RemoteBrowser("http://host:8080") as browser:
-    await browser.goto("https://example.com")
-```
-
-### Key parameters (BrowserClient)
-
-| Param | Default | Description |
-|-------|---------|-------------|
-| `profile_path` | None | Chrome profile dir (persistent session) |
-| `headless` | True | Headless mode (forced False if interactive) |
-| `proxy` | None | `{server, username, password}` — Patchright handles auth |
-| `record` | False | Enable HAR + video + state recording |
-| `record_dir` | auto | Recording output dir |
-| `interactive` | False | Human mode: visible Chrome, wait_closed() |
-| `cookies` | [] | Cookies to inject at start |
-| `channel` | auto-detect | chrome, chrome-beta, chromium |
-
-## CLI
-
-```bash
-otomata browser fetch URL [--html] [--record] [--proxy SERVER]
-otomata browser screenshot URL [-o FILE] [--record]
-otomata browser open [URL] [--profile PATH] [--record] [--proxy SERVER]
-otomata browser run SCRIPT [--profile PATH] [--record]
-```
-
-Proxy format: `http://user:pass@host:port`
-
-## Service (Docker)
-
-For remote/headless server deployments. Not needed for local use.
-
-| Nginx path | Upstream | Notes |
-|------------|----------|-------|
-| `/api/` | `:3080` | API server |
-| `/vnc/` | `:6080` | noVNC |
-| `/cdp/` | `:9222` | Chrome DevTools Protocol |
-
-Recording output (service): `rrweb-events.json`, `network.har`, `browser-state.jsonl`, `screencast.mp4`
-
-## Gotchas
-
-- **Profile incompatibility**: Profiles from different Chromium builds may crash. Reset if "Trace/breakpoint trap"
-- **Cookie encryption**: Chrome encrypts cookies per-build — cookies from a different build are unreadable
-- **SingletonLock**: `start-session.sh` cleans stale locks before launch
-- **ffmpeg for video**: Patchright needs `patchright install ffmpeg` for `record=True` video capture
+Per-session output in `recordings/<session_id>/`:
+- `rrweb-events.json` — DOM interactions (replay format)
+- `network.har` — HAR 1.2 with response bodies
+- `browser-state.jsonl` — cookies/localStorage/sessionStorage snapshots
+- `screencast.mp4` — X11 video capture
+- `screenshots/` — step snapshots (from automation)
 
 ## Downstream
 
-- `otomata-tools/browser` — domain clients (LinkedIn, Crunchbase, Pappers, G2, Indeed) import `from o_browser import BrowserClient`
-- `roundtable/browser-service` — adds profile seeds and Roundtable-specific config
+- `roundtable/browser-service` — fork with Wise profile seeds

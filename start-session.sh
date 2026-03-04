@@ -23,6 +23,14 @@ BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Persistent Chrome profile directory
 PROFILES_BASE_DIR="${BASE_DIR}/profiles"
 CHROME_DATA_DIR="${PROFILES_BASE_DIR}/${PROFILE}"
+
+# Seed profile from profiles-seed/ if profile doesn't exist yet
+SEED_DIR="${BASE_DIR}/profiles-seed/${PROFILE}"
+if [ ! -d "${CHROME_DATA_DIR}/Default" ] && [ -d "${SEED_DIR}" ]; then
+    echo "Seeding profile from profiles-seed/${PROFILE}"
+    cp -r "${SEED_DIR}" "${CHROME_DATA_DIR}"
+fi
+
 mkdir -p "${CHROME_DATA_DIR}/Default"
 echo "Using Chrome profile: ${PROFILE} (${CHROME_DATA_DIR})"
 

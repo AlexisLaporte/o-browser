@@ -4,9 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'service/**'
+      - '*.js'
+      - '*.sh'
       - 'Dockerfile'
-      - 'docker-entrypoint.sh'
       - 'nginx.conf'
       - 'package.json'
       - '.github/workflows/docker.yml'

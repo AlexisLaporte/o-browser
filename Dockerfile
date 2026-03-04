@@ -1,7 +1,6 @@
 FROM node:20-slim
 
 # Install system deps (Xvfb, x11vnc, websockify, ffmpeg, nginx, tini)
-# Chromium is installed separately via Patchright (anti-detection patched)
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
@@ -28,24 +27,36 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --production 2>/dev/null || true
 
-# Install Patchright's anti-detection Chromium
-ENV PLAYWRIGHT_BROWSERS_PATH=/app/.browsers
-RUN npx patchright install chromium --with-deps \
-    && ln -sf $(find /app/.browsers -name "chrome" -type f | head -1) /usr/bin/google-chrome
+# Install browser: chrome (default), chrome-beta, or chromium
+ARG BROWSER=chrome
+RUN if [ "$BROWSER" = "chrome" ] || [ "$BROWSER" = "chrome-beta" ]; then \
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+      && echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
+      && apt-get update \
+      && if [ "$BROWSER" = "chrome-beta" ]; then \
+           apt-get install -y google-chrome-beta && ln -sf /usr/bin/google-chrome-beta /usr/bin/google-chrome; \
+         else \
+           apt-get install -y google-chrome-stable; \
+         fi \
+      && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$BROWSER" = "chromium" ]; then \
+      apt-get update && apt-get install -y chromium && rm -rf /var/lib/apt/lists/* \
+      && ln -sf /usr/bin/chromium /usr/bin/google-chrome; \
+    fi
 
-# Copy service files (flatten into /app/ for runtime)
-COPY service/api-server.js service/session-recorder.js ./
-COPY service/start-session.sh service/end-session.sh ./
+# Copy app files
+COPY api-server.js session-recorder.js ./
+COPY start-session.sh end-session.sh ./
 RUN chmod +x *.sh
 
 # Copy UI
-COPY service/ui/ ./ui/
+COPY ui/ ./ui/
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # Create directories
-RUN mkdir -p /app/sessions /app/recordings
+RUN mkdir -p /app/sessions /app/recordings /app/profiles
 
 # Environment
 ENV DISPLAY=:99
