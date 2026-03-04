@@ -26,7 +26,6 @@ const statePath = path.join(recordingDir, 'browser-state.jsonl');
 
 const rrwebEvents = [];
 const requests = new Map();
-const pendingBodies = new Map(); // requestId → entry (waiting for getResponseBody)
 const har = {
   log: {
     version: '1.2',
@@ -42,21 +41,21 @@ const MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
 // ---- CDP Connection ----
 
-function getCdpWebSocketUrl() {
+function cdpGet(endpoint) {
   return new Promise((resolve, reject) => {
-    http.get(`http://127.0.0.1:${cdpPort}/json/version`, (res) => {
+    http.get(`http://127.0.0.1:${cdpPort}${endpoint}`, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        const info = JSON.parse(data);
-        if (info.webSocketDebuggerUrl) {
-          resolve(info.webSocketDebuggerUrl);
-        } else {
-          reject(new Error('No browser WebSocket URL found'));
-        }
-      });
+      res.on('end', () => resolve(JSON.parse(data)));
     }).on('error', reject);
   });
+}
+
+async function getPageWebSocketUrl() {
+  const targets = await cdpGet('/json');
+  const page = targets.find(t => t.type === 'page');
+  if (page?.webSocketDebuggerUrl) return page.webSocketDebuggerUrl;
+  throw new Error('No page target found');
 }
 
 let ws;
@@ -68,7 +67,6 @@ function send(method, params = {}) {
     const id = msgId++;
     pending.set(id, { resolve, reject });
     ws.send(JSON.stringify({ id, method, params }));
-    // Timeout after 10s
     setTimeout(() => {
       if (pending.has(id)) {
         pending.delete(id);
@@ -83,7 +81,6 @@ function send(method, params = {}) {
 let rrwebScript = null;
 
 function loadRrwebScript() {
-  // Try multiple possible paths for the rrweb UMD bundle
   const bases = [__dirname, path.join(__dirname, '..')];
   const candidates = bases.flatMap(base => [
     path.join(base, 'node_modules', '@rrweb', 'record', 'dist', 'record.umd.cjs'),
@@ -116,12 +113,15 @@ function buildInjectionScript() {
 `;
 }
 
-async function injectRrweb() {
-  const script = buildInjectionScript();
-  // Inject on every new document
-  await send('Page.addScriptToEvaluateOnNewDocument', { source: script });
-  // Also inject into current page
-  await send('Runtime.evaluate', { expression: script }).catch(() => {});
+// Inject rrweb into the current page (called after page load)
+async function injectRrwebIntoPage() {
+  try {
+    const script = buildInjectionScript();
+    await send('Runtime.evaluate', { expression: script });
+    console.log('rrweb injected into page');
+  } catch (e) {
+    console.log('rrweb injection failed:', e.message);
+  }
 }
 
 let rrwebPollTimer = null;
@@ -220,7 +220,6 @@ async function handleLoadingFinished(params) {
   const entry = requests.get(requestId);
   if (!entry || !entry.response) return;
 
-  // Try to capture response body
   if (shouldCaptureBody(entry._mimeType) && encodedDataLength < MAX_BODY_SIZE) {
     try {
       const result = await send('Network.getResponseBody', { requestId });
@@ -240,10 +239,8 @@ async function handleLoadingFinished(params) {
     }
   }
 
-  // Clean up internal fields
   delete entry._timestamp;
   delete entry._mimeType;
-
   har.log.entries.push(entry);
   requests.delete(requestId);
 }
@@ -286,7 +283,6 @@ function saveRrweb() {
 }
 
 function saveHar() {
-  // Flush pending requests that have responses
   for (const [id, entry] of requests) {
     if (entry.response && !har.log.entries.includes(entry)) {
       delete entry._timestamp;
@@ -307,14 +303,11 @@ function saveAll() {
 
 async function main() {
   console.log(`Session Recorder starting — output: ${recordingDir}`);
-
-  // Load rrweb
   rrwebScript = loadRrwebScript();
 
-  // Connect to CDP
   let wsUrl;
   try {
-    wsUrl = await getCdpWebSocketUrl();
+    wsUrl = await getPageWebSocketUrl();
   } catch (e) {
     console.error('Failed to get CDP URL:', e.message);
     process.exit(1);
@@ -329,7 +322,6 @@ async function main() {
       await send('Network.enable');
       await send('Page.enable');
       await send('Runtime.enable');
-      await injectRrweb();
       startRrwebPolling();
       console.log('All domains enabled, recording started.');
     } catch (e) {
@@ -364,7 +356,8 @@ async function main() {
         handleLoadingFinished(msg.params);
         break;
       case 'Page.loadEventFired':
-        // Capture state after page loads
+        // Page loaded — inject rrweb and capture browser state
+        injectRrwebIntoPage();
         send('Runtime.evaluate', {
           expression: 'window.location.href',
           returnByValue: true
@@ -372,7 +365,6 @@ async function main() {
         break;
       case 'Page.frameNavigated':
         if (msg.params?.frame?.parentId === undefined) {
-          // Top-level navigation only
           captureBrowserState(msg.params.frame.url);
         }
         break;
@@ -389,7 +381,6 @@ async function main() {
     console.error('WebSocket error:', err.message);
   });
 
-  // Graceful shutdown
   const shutdown = () => {
     console.log('Signal received, saving and exiting...');
     if (rrwebPollTimer) clearInterval(rrwebPollTimer);
