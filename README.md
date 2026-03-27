@@ -1,84 +1,50 @@
 # o-browser
 
-Generic headless Chrome browser service with VNC, CDP, and session management.
+Python async browser automation client built on Patchright.
 
-## Quick start
+## Install
 
 ```bash
-AUTH_TOKEN=your-secret-token docker compose up -d
+pip install o-browser
 ```
 
-Open http://localhost:8080/?token=your-secret-token
+## Usage
+
+```python
+from o_browser import BrowserClient, RemoteBrowser
+
+# Local headless browser
+async with BrowserClient() as browser:
+    await browser.goto("https://example.com")
+    text = await browser.get_text()
+
+# Persistent Chrome profile (cookies survive between runs)
+async with BrowserClient(profile_path="~/.config/browser/linkedin") as browser:
+    await browser.goto("https://linkedin.com")
+
+# With recording (HAR + video)
+async with BrowserClient(record=True) as browser:
+    await browser.goto("https://example.com")
+
+# Interactive (opens browser window, waits for user to close)
+async with BrowserClient(interactive=True) as browser:
+    await browser.wait_closed()
+
+# Connect to remote Chrome (e.g. o-browser-server)
+async with RemoteBrowser("http://host:8080") as browser:
+    await browser.goto("https://example.com")
+```
 
 ## Features
 
-- Chrome headful in virtual display (Xvfb)
-- VNC access via WebSocket (noVNC)
-- CDP endpoint for Playwright/Puppeteer
-- Session management API (start/stop, recordings)
-- Web UI for manual control
-- Anti-detection via Patchright (patched Chromium)
+- Headless and headful modes
+- Persistent Chrome profiles
+- HAR + video recording
+- Proxy support
+- Cookie management
+- CDP connection to existing Chrome instances
+- Anti-detection via Patchright
 
-## Endpoints
+## Related
 
-| Path | Auth | Description |
-|------|------|-------------|
-| `/` | - | Web UI |
-| `/api/*` | Bearer token | Session management API |
-| `/vnc?token=xxx` | Query param | VNC WebSocket |
-| `/cdp/*` | Bearer token | Chrome DevTools Protocol |
-
-## API
-
-### Start session
-```bash
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-  -d '{"profile":"default"}' \
-  http://localhost:8080/api/sessions
-```
-
-### Get current session
-```bash
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/sessions/current
-```
-
-### Stop session
-```bash
-curl -X DELETE -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/sessions/current
-```
-
-### Take screenshot
-```bash
-curl -X POST -H "Authorization: Bearer $TOKEN" \
-  -d '{"name":"step1"}' \
-  http://localhost:8080/api/sessions/current/screenshot
-```
-
-## Deployment (Cloud Run)
-
-```bash
-docker compose build
-docker tag o-browser-browser:latest europe-west1-docker.pkg.dev/PROJECT/docker/o-browser
-docker push europe-west1-docker.pkg.dev/PROJECT/docker/o-browser
-
-gcloud run deploy o-browser \
-  --image=europe-west1-docker.pkg.dev/PROJECT/docker/o-browser:latest \
-  --region=europe-west1 \
-  --execution-environment=gen2 \
-  --memory=4Gi --cpu=2 \
-  --no-cpu-throttling \
-  --min-instances=1 --max-instances=1 \
-  --timeout=3600 \
-  --session-affinity \
-  --allow-unauthenticated \
-  --port=8080 \
-  --set-env-vars=AUTH_TOKEN=xxx
-```
-
-Key flags:
-- `gen2`: full Linux kernel (needed for Chrome)
-- `no-cpu-throttling`: Chrome needs CPU even idle
-- `min-instances=1`: no cold start
-- `session-affinity`: sticky VNC/CDP connections
+For a full remote browser service with VNC, session management, and recording, see [o-browser-server](https://github.com/AlexisLaporte/o-browser-server).

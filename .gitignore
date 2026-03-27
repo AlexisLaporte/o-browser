@@ -1,16 +1,5 @@
-node_modules/
-
-# Chrome profiles (persistent, contain cookies/passwords)
-profiles/
-
-# Session data (temporary)
-sessions/
-
-# Recordings (can be large)
-recordings/
-
-# Python
 __pycache__/
 *.egg-info/
 dist/
 .eggs/
+venv/

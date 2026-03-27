@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "o-browser"
+version = "0.1.0"
+description = "Browser automation client — local Chrome via Patchright or remote via CDP"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Alexis Laporte" }
+]
+dependencies = [
+    "patchright>=0.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["o_browser"]

@@ -1,65 +1,45 @@
-# o-browser — Headless Chrome Service
+# o-browser — Python Browser Automation Client
 
-Remote Chrome with API, VNC, CDP proxy, and session recording.
+Async browser automation via Patchright (patched Playwright).
 
-## Stack
+## Install
 
-- **Runtime**: Node.js 20 + Bash
-- **Browser**: Google Chrome stable (default), configurable via `BROWSER` build arg
-- **Recording**: rrweb DOM replay + HAR with bodies + browser state snapshots
-- **Dependencies**: ws, @rrweb/record
+```bash
+pip install o-browser        # from PyPI
+pip install -e .             # editable local
+```
+
+## Usage
+
+```python
+# Headless
+async with BrowserClient() as browser:
+    await browser.goto("https://example.com")
+    text = await browser.get_text()
+
+# Persistent profile (cookies survive between runs)
+async with BrowserClient(profile_path="~/.config/browser/linkedin") as browser:
+    await browser.goto("https://linkedin.com")
+
+# Connect to remote Chrome (e.g. o-browser-server)
+async with RemoteBrowser("http://host:8080") as browser:
+    await browser.goto("https://example.com")
+```
 
 ## Structure
 
 ```
-o-browser/
-├── api-server.js           # HTTP API (sessions, recordings, screenshots)
-├── session-recorder.js     # rrweb DOM + HAR + browser state via CDP
-├── start-session.sh        # Launches Chrome + Xvfb + VNC + ffmpeg + recorder
-├── end-session.sh          # Stops session, saves recordings
-├── ui/                     # Status page (index.html, app.js, style.css)
-├── Dockerfile              # ARG BROWSER=chrome|chrome-beta|chromium
-├── docker-compose.yml
-├── docker-entrypoint.sh
-├── nginx.conf              # Reverse proxy: /api, /vnc, /cdp on port 8080
-└── package.json
+o_browser/
+├── __init__.py    # exports BrowserClient, RemoteBrowser
+├── _mixin.py      # PageMixin — shared methods (goto, click, get_text, scroll, screenshot)
+├── client.py      # BrowserClient — launches Chrome locally via Patchright
+└── remote.py      # RemoteBrowser — connects to remote Chrome via CDP WebSocket
 ```
 
-## Docker
+## Dependencies
 
-```bash
-docker build -t o-browser .                              # Chrome stable (default)
-docker build --build-arg BROWSER=chrome-beta -t o-browser .  # Chrome Beta
-docker build --build-arg BROWSER=chromium -t o-browser .     # Chromium
-```
+- `patchright` (Playwright fork with anti-detection patches)
 
-## API (port 8080 via nginx)
+## Related
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/sessions` | Start session `{workflow, profile}` |
-| `GET` | `/api/sessions/current` | Current session (CDP URL, VNC, status) |
-| `DELETE` | `/api/sessions/current` | End session |
-| `POST` | `/api/sessions/current/screenshot` | X11 screenshot `{name}` |
-| `GET` | `/api/sessions/:id/files` | List recordings (screencast, HAR, rrweb, state) |
-| `GET` | `/api/recordings/:id/:file` | Serve recording file (Range support) |
-| `GET` | `/api/profiles` | List Chrome profiles |
-| `GET` | `/health` | Health check |
-
-## Profiles
-
-- `profiles/` — persistent Chrome profiles (volume-mounted)
-- `profiles-seed/` — initial profile data, copied on first use if profile doesn't exist
-
-## Recording
-
-Per-session output in `recordings/<session_id>/`:
-- `rrweb-events.json` — DOM interactions (replay format)
-- `network.har` — HAR 1.2 with response bodies
-- `browser-state.jsonl` — cookies/localStorage/sessionStorage snapshots
-- `screencast.mp4` — X11 video capture
-- `screenshots/` — step snapshots (from automation)
-
-## Downstream
-
-- `roundtable/browser-service` — fork with Wise profile seeds
+- [o-browser-server](https://github.com/AlexisLaporte/o-browser-server) — Docker service (VNC + CDP + recording)
