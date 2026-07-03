@@ -32,6 +32,14 @@ async with RemoteBrowser("http://host:8080") as browser:
     await browser.goto("https://example.com")
 ```
 
+**⚠️ Profil persistant ≠ session.** Un `profile_path` conserve les cookies *persistants*
+(à date d'expiration), PAS les **session cookies** — Chrome les purge à la fermeture du
+contexte. Un login dont la session repose sur des session cookies (ex. CAS
+elnet/lemediasocial) **ne survit donc pas d'une instance à l'autre** : faire le login ET
+les actions authentifiées **dans la même instance** `BrowserClient` (login à la demande
+quand la page signale l'anonymat, ex. bloc paywall). Cas vécu : fetcher Média Social 4as
+(2026-07 — deux instances séparées ⇒ tous les rendus anonymes malgré un login réussi).
+
 ## Structure (monorepo)
 
 ```
@@ -65,6 +73,19 @@ VivaTechClient = load_site("vivatech")
    `[project.entry-points."o_browser.sites"]` → `<site> = "o_browser_<site>:<Client>"`.
 2. `adapters/<site>/o_browser_<site>/__init__.py` — le client, `from o_browser import BrowserClient`.
 3. `pip install -e adapters/<site>` (dev) ; publier la distribution séparément.
+
+### Publier (PyPI)
+
+Chaque distribution se publie **séparément** (core à la racine, chaque `adapters/<site>/`). `hatch`
+ne marche pas ici (pas de `python`) → `build` + `twine` dans un venv, token SOPS `PYPI_TOKEN` :
+
+```bash
+python3 -m venv /tmp/buildenv && /tmp/buildenv/bin/pip install build twine
+cd <dir>  # racine pour o-browser, adapters/<site> pour un adapter ; bump version d'abord
+rm -rf dist && /tmp/buildenv/bin/python -m build
+TWINE_USERNAME=__token__ TWINE_PASSWORD="$(sops -d --extract '["PYPI_TOKEN"]' ~/.otomata/secrets/secrets.yaml)" \
+  /tmp/buildenv/bin/twine upload dist/*
+```
 
 `record=True` écrit le HAR via `HARRecorder` (buffer Python), pas via le HAR natif Playwright :
 ce dernier se perdait quand l'utilisateur fermait la fenêtre en mode interactif (browser mort avant
