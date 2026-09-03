@@ -1,7 +1,7 @@
 from importlib.metadata import entry_points
 
 from .client import BrowserClient
-from .remote import RemoteBrowser
+# DÉFAUT INJECTÉ : from .remote import RemoteBrowser
 
 # Site adapters (LinkedIn, VivaTech, ...) are NOT bundled in core. Each ships as its own
 # distribution and registers in the "o_browser.sites" entry-point group. The core only
